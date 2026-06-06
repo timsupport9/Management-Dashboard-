@@ -3,23 +3,16 @@ const cors = require('cors');
 const admin = require('firebase-admin');
 
 const app = express();
-const PORT = 5000; // or any fixed port
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
 
-// ---------- Firebase Admin Initialisation with hardcoded keys ----------
+// ---------- Firebase Admin (using environment variables) ----------
 const serviceAccount = {
-  projectId: "admin-management--panel",
-  privateKey: "var admin = require("firebase-admin");
-
-var serviceAccount = require("path/to/serviceAccountKey.json");
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: "https://admin-management--panel-default-rtdb.firebaseio.com"
-});   ",
-  clientEmail: "firebase-adminsdk-fbsvc@admin-management--panel.iam.gserviceaccount.com"
+  projectId: process.env.FIREBASE_PROJECT_ID,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
 };
 
 if (!admin.apps.length) {
@@ -31,21 +24,13 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 // ---------- Helper Functions ----------
-// Generate a numeric ID (timestamp) to keep compatibility with the frontend
 function getNextId() {
   return Date.now();
 }
 
-// Generic Firestore helpers for common operations
 async function getAll(collection) {
   const snapshot = await db.collection(collection).get();
   return snapshot.docs.map(doc => ({ id: doc.data().id, ...doc.data() }));
-}
-
-async function getById(collection, id) {
-  const snapshot = await db.collection(collection).where('id', '==', id).limit(1).get();
-  if (snapshot.empty) return null;
-  return { id: snapshot.docs[0].data().id, ...snapshot.docs[0].data() };
 }
 
 async function create(collection, data) {
@@ -83,270 +68,222 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// ---------- CRUD Endpoints (Firestore version) ----------
+// ---------- Error handling wrapper ----------
+const asyncHandler = (fn) => (req, res) => {
+  Promise.resolve(fn(req, res)).catch(err => {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  });
+};
 
-// Experts
-app.get('/api/experts', async (req, res) => {
+// ---------- CRUD Endpoints (only showing a few – all are identical pattern) ----------
+app.get('/api/experts', asyncHandler(async (req, res) => {
   res.json(await getAll('experts'));
-});
-app.post('/api/experts', async (req, res) => {
+}));
+app.post('/api/experts', asyncHandler(async (req, res) => {
   const expert = await create('experts', req.body);
   res.json(expert);
-});
-app.put('/api/experts/:id', async (req, res) => {
+}));
+app.put('/api/experts/:id', asyncHandler(async (req, res) => {
   const expert = await update('experts', parseInt(req.params.id), req.body);
   res.json(expert);
-});
-app.delete('/api/experts/:id', async (req, res) => {
+}));
+app.delete('/api/experts/:id', asyncHandler(async (req, res) => {
   await remove('experts', parseInt(req.params.id));
   res.status(204).send();
-});
+}));
 
 // Events
-app.get('/api/events', async (req, res) => {
+app.get('/api/events', asyncHandler(async (req, res) => {
   res.json(await getAll('events'));
-});
-app.post('/api/events', async (req, res) => {
+}));
+app.post('/api/events', asyncHandler(async (req, res) => {
   const event = await create('events', req.body);
   res.json(event);
-});
-app.put('/api/events/:id', async (req, res) => {
+}));
+app.put('/api/events/:id', asyncHandler(async (req, res) => {
   const event = await update('events', parseInt(req.params.id), req.body);
   res.json(event);
-});
-app.delete('/api/events/:id', async (req, res) => {
+}));
+app.delete('/api/events/:id', asyncHandler(async (req, res) => {
   await remove('events', parseInt(req.params.id));
   res.status(204).send();
-});
+}));
 
 // Activities
-app.get('/api/activities', async (req, res) => {
+app.get('/api/activities', asyncHandler(async (req, res) => {
   res.json(await getAll('activities'));
-});
-app.post('/api/activities', async (req, res) => {
+}));
+app.post('/api/activities', asyncHandler(async (req, res) => {
   const activity = await create('activities', req.body);
   res.json(activity);
-});
-app.put('/api/activities/:id', async (req, res) => {
+}));
+app.put('/api/activities/:id', asyncHandler(async (req, res) => {
   const activity = await update('activities', parseInt(req.params.id), req.body);
   res.json(activity);
-});
-app.delete('/api/activities/:id', async (req, res) => {
+}));
+app.delete('/api/activities/:id', asyncHandler(async (req, res) => {
   await remove('activities', parseInt(req.params.id));
   res.status(204).send();
-});
+}));
 
 // Programs
-app.get('/api/programs', async (req, res) => {
+app.get('/api/programs', asyncHandler(async (req, res) => {
   res.json(await getAll('programs'));
-});
-app.post('/api/programs', async (req, res) => {
+}));
+app.post('/api/programs', asyncHandler(async (req, res) => {
   const program = await create('programs', req.body);
   res.json(program);
-});
-app.put('/api/programs/:id', async (req, res) => {
+}));
+app.put('/api/programs/:id', asyncHandler(async (req, res) => {
   const program = await update('programs', parseInt(req.params.id), req.body);
   res.json(program);
-});
-app.delete('/api/programs/:id', async (req, res) => {
+}));
+app.delete('/api/programs/:id', asyncHandler(async (req, res) => {
   await remove('programs', parseInt(req.params.id));
   res.status(204).send();
-});
+}));
 
 // Partners
-app.get('/api/partners', async (req, res) => {
+app.get('/api/partners', asyncHandler(async (req, res) => {
   res.json(await getAll('partners'));
-});
-app.post('/api/partners', async (req, res) => {
+}));
+app.post('/api/partners', asyncHandler(async (req, res) => {
   const partner = await create('partners', req.body);
   res.json(partner);
-});
-app.put('/api/partners/:id', async (req, res) => {
+}));
+app.put('/api/partners/:id', asyncHandler(async (req, res) => {
   const partner = await update('partners', parseInt(req.params.id), req.body);
   res.json(partner);
-});
-app.delete('/api/partners/:id', async (req, res) => {
+}));
+app.delete('/api/partners/:id', asyncHandler(async (req, res) => {
   await remove('partners', parseInt(req.params.id));
   res.status(204).send();
-});
+}));
 
-// Allocations (Bookings)
-app.get('/api/allocations', async (req, res) => {
+// Allocations
+app.get('/api/allocations', asyncHandler(async (req, res) => {
   res.json(await getAll('allocations'));
-});
-app.post('/api/allocations', async (req, res) => {
+}));
+app.post('/api/allocations', asyncHandler(async (req, res) => {
   const alloc = await create('allocations', { ...req.body, date: new Date().toLocaleString() });
   res.json(alloc);
-});
+}));
 
 // Logs
-app.get('/api/logs', async (req, res) => {
+app.get('/api/logs', asyncHandler(async (req, res) => {
   const logs = await getAll('logs');
   logs.sort((a, b) => b.id - a.id);
   res.json(logs.slice(0, 200));
-});
-app.post('/api/logs', async (req, res) => {
+}));
+app.post('/api/logs', asyncHandler(async (req, res) => {
   const log = await create('logs', { timestamp: new Date().toLocaleString(), ...req.body });
   res.json(log);
-});
+}));
 
 // Event Registrations
-app.get('/api/eventRegistrations', async (req, res) => {
+app.get('/api/eventRegistrations', asyncHandler(async (req, res) => {
   res.json(await getAll('eventRegistrations'));
-});
-app.post('/api/eventRegistrations', async (req, res) => {
+}));
+app.post('/api/eventRegistrations', asyncHandler(async (req, res) => {
   const reg = await create('eventRegistrations', req.body);
   res.json(reg);
-});
-app.patch('/api/eventRegistrations/:id/attend', async (req, res) => {
+}));
+app.patch('/api/eventRegistrations/:id/attend', asyncHandler(async (req, res) => {
   const reg = await update('eventRegistrations', parseInt(req.params.id), { attendance: 'Present' });
   res.json(reg);
-});
+}));
 
 // Program Enrollments
-app.get('/api/programEnrollments', async (req, res) => {
+app.get('/api/programEnrollments', asyncHandler(async (req, res) => {
   res.json(await getAll('programEnrollments'));
-});
-app.post('/api/programEnrollments', async (req, res) => {
+}));
+app.post('/api/programEnrollments', asyncHandler(async (req, res) => {
   const enroll = await create('programEnrollments', { completed: false, ...req.body });
   res.json(enroll);
-});
-app.patch('/api/programEnrollments/:id/complete', async (req, res) => {
+}));
+app.patch('/api/programEnrollments/:id/complete', asyncHandler(async (req, res) => {
   const enroll = await update('programEnrollments', parseInt(req.params.id), { completed: true });
   res.json(enroll);
-});
+}));
 
-// Applications – Expert
-app.get('/api/applications/expert', async (req, res) => {
+// Applications
+app.get('/api/applications/expert', asyncHandler(async (req, res) => {
   res.json(await getAll('expertApplications'));
-});
-app.post('/api/applications/expert', async (req, res) => {
+}));
+app.post('/api/applications/expert', asyncHandler(async (req, res) => {
   const appDoc = await create('expertApplications', req.body);
   res.json(appDoc);
-});
-app.patch('/api/applications/expert/:id', async (req, res) => {
+}));
+app.patch('/api/applications/expert/:id', asyncHandler(async (req, res) => {
   const appDoc = await update('expertApplications', parseInt(req.params.id), req.body);
   res.json(appDoc);
-});
+}));
 
-// Corporate
-app.get('/api/applications/corporate', async (req, res) => {
+app.get('/api/applications/corporate', asyncHandler(async (req, res) => {
   res.json(await getAll('corporateApplications'));
-});
-app.post('/api/applications/corporate', async (req, res) => {
+}));
+app.post('/api/applications/corporate', asyncHandler(async (req, res) => {
   const appDoc = await create('corporateApplications', req.body);
   res.json(appDoc);
-});
-app.patch('/api/applications/corporate/:id', async (req, res) => {
+}));
+app.patch('/api/applications/corporate/:id', asyncHandler(async (req, res) => {
   const appDoc = await update('corporateApplications', parseInt(req.params.id), req.body);
   res.json(appDoc);
-});
+}));
 
-// Membership
-app.get('/api/applications/membership', async (req, res) => {
+app.get('/api/applications/membership', asyncHandler(async (req, res) => {
   res.json(await getAll('membershipApplications'));
-});
-app.post('/api/applications/membership', async (req, res) => {
+}));
+app.post('/api/applications/membership', asyncHandler(async (req, res) => {
   const appDoc = await create('membershipApplications', req.body);
   res.json(appDoc);
-});
-app.patch('/api/applications/membership/:id', async (req, res) => {
+}));
+app.patch('/api/applications/membership/:id', asyncHandler(async (req, res) => {
   const appDoc = await update('membershipApplications', parseInt(req.params.id), req.body);
   res.json(appDoc);
-});
+}));
 
-// Goals
-app.get('/api/goals', async (req, res) => {
-  res.json(await getAll('goals'));
-});
-app.post('/api/goals', async (req, res) => {
-  const goal = await create('goals', req.body);
-  res.json(goal);
-});
-app.put('/api/goals/:id', async (req, res) => {
-  const goal = await update('goals', parseInt(req.params.id), req.body);
-  res.json(goal);
-});
-app.delete('/api/goals/:id', async (req, res) => {
-  await remove('goals', parseInt(req.params.id));
-  res.status(204).send();
-});
+// Goals, KPIs, Projects
+app.get('/api/goals', asyncHandler(async (req, res) => { res.json(await getAll('goals')); }));
+app.post('/api/goals', asyncHandler(async (req, res) => { const goal = await create('goals', req.body); res.json(goal); }));
+app.put('/api/goals/:id', asyncHandler(async (req, res) => { const goal = await update('goals', parseInt(req.params.id), req.body); res.json(goal); }));
+app.delete('/api/goals/:id', asyncHandler(async (req, res) => { await remove('goals', parseInt(req.params.id)); res.status(204).send(); }));
 
-// KPIs
-app.get('/api/kpis', async (req, res) => {
-  res.json(await getAll('kpis'));
-});
-app.post('/api/kpis', async (req, res) => {
-  const kpi = await create('kpis', req.body);
-  res.json(kpi);
-});
-app.put('/api/kpis/:id', async (req, res) => {
-  const kpi = await update('kpis', parseInt(req.params.id), req.body);
-  res.json(kpi);
-});
-app.delete('/api/kpis/:id', async (req, res) => {
-  await remove('kpis', parseInt(req.params.id));
-  res.status(204).send();
-});
+app.get('/api/kpis', asyncHandler(async (req, res) => { res.json(await getAll('kpis')); }));
+app.post('/api/kpis', asyncHandler(async (req, res) => { const kpi = await create('kpis', req.body); res.json(kpi); }));
+app.put('/api/kpis/:id', asyncHandler(async (req, res) => { const kpi = await update('kpis', parseInt(req.params.id), req.body); res.json(kpi); }));
+app.delete('/api/kpis/:id', asyncHandler(async (req, res) => { await remove('kpis', parseInt(req.params.id)); res.status(204).send(); }));
 
-// Projects
-app.get('/api/projects', async (req, res) => {
-  res.json(await getAll('projects'));
-});
-app.post('/api/projects', async (req, res) => {
-  const project = await create('projects', req.body);
-  res.json(project);
-});
-app.put('/api/projects/:id', async (req, res) => {
-  const project = await update('projects', parseInt(req.params.id), req.body);
-  res.json(project);
-});
-app.delete('/api/projects/:id', async (req, res) => {
-  await remove('projects', parseInt(req.params.id));
-  res.status(204).send();
-});
+app.get('/api/projects', asyncHandler(async (req, res) => { res.json(await getAll('projects')); }));
+app.post('/api/projects', asyncHandler(async (req, res) => { const project = await create('projects', req.body); res.json(project); }));
+app.put('/api/projects/:id', asyncHandler(async (req, res) => { const project = await update('projects', parseInt(req.params.id), req.body); res.json(project); }));
+app.delete('/api/projects/:id', asyncHandler(async (req, res) => { await remove('projects', parseInt(req.params.id)); res.status(204).send(); }));
 
-// ---------- Bulk Import Endpoint ----------
-app.post('/api/import', async (req, res) => {
-  try {
-    const data = req.body;
-    const collections = {
-      experts: data.experts,
-      events: data.events,
-      activities: data.activities,
-      programs: data.programs,
-      partners: data.partners,
-      allocations: data.allocations,
-      logs: data.systemLogs,
-      eventRegistrations: data.eventRegistrations,
-      programEnrollments: data.programEnrollments,
-      expertApplications: data.expertApplications,
-      corporateApplications: data.corporateApplications,
-      membershipApplications: data.membershipApplications,
-      goals: data.goals,
-      kpis: data.kpis,
-      projects: data.projects,
-    };
-
-    // Use a batched write for better performance and atomicity (per collection)
-    for (const [collectionName, docs] of Object.entries(collections)) {
-      if (docs && Array.isArray(docs) && docs.length) {
-        const batch = db.batch();
-        docs.forEach(doc => {
-          const docRef = db.collection(collectionName).doc(doc.id?.toString() || getNextId().toString());
-          if (!doc.id) doc.id = getNextId();
-          batch.set(docRef, doc);
-        });
-        await batch.commit();
-      }
+// Bulk Import
+app.post('/api/import', asyncHandler(async (req, res) => {
+  const data = req.body;
+  const collections = {
+    experts: data.experts, events: data.events, activities: data.activities,
+    programs: data.programs, partners: data.partners, allocations: data.allocations,
+    logs: data.systemLogs, eventRegistrations: data.eventRegistrations,
+    programEnrollments: data.programEnrollments, expertApplications: data.expertApplications,
+    corporateApplications: data.corporateApplications, membershipApplications: data.membershipApplications,
+    goals: data.goals, kpis: data.kpis, projects: data.projects,
+  };
+  for (const [collectionName, docs] of Object.entries(collections)) {
+    if (docs && Array.isArray(docs) && docs.length) {
+      const batch = db.batch();
+      docs.forEach(doc => {
+        const docRef = db.collection(collectionName).doc(doc.id?.toString() || getNextId().toString());
+        if (!doc.id) doc.id = getNextId();
+        batch.set(docRef, doc);
+      });
+      await batch.commit();
     }
-
-    res.json({ message: 'Import successful' });
-  } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: 'Invalid data' });
   }
-});
+  res.json({ message: 'Import successful' });
+}));
 
 // Start server
 app.listen(PORT, () => {
