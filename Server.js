@@ -98,19 +98,32 @@ app.use(morgan('combined', { stream: { write: (message) => logger.info(message.t
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 
-// ---------- Firebase Admin with Retry ----------
+// ---------- Firebase Admin Initialization ----------
 const serviceAccount = {
   projectId: process.env.FIREBASE_PROJECT_ID,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  // Ensure we safely handle the key string
+  privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : undefined,
   clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
 };
 
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log("✅ Firebase Admin Initialized");
+  } catch (error) {
+    logger.error("❌ Firebase Initialization Error:", error);
+    process.exit(1);
+  }
 }
 const db = admin.firestore();
+
+// Firestore settings
+db.settings({
+  ignoreUndefinedProperties: true 
+});
+
 
 // Enable Firestore retries
 db.settings({
@@ -153,17 +166,17 @@ async function getOne(collection, id) {
   return snapshot.docs[0].data();
 }
 
+// Change your create function to:
 async function create(collection, data) {
-  const docId = getNextId();
-  const newDoc = { id: docId, ...data };
-  await withRetry(() => db.collection(collection).doc(docId).set(newDoc));
+  const docRef = db.collection(collection).doc(); // Let Firestore generate a secure ID
+  const newDoc = { id: docRef.id, ...data }; // Assign it to your data object
+  await withRetry(() => docRef.set(newDoc));
   return newDoc;
 }
 
+// Change your update/remove functions to use the document ID directly
 async function update(collection, id, data) {
-  const snapshot = await withRetry(() => db.collection(collection).where('id', '==', id).limit(1).get());
-  if (snapshot.empty) throw new Error('Document not found');
-  const docRef = snapshot.docs[0].ref;
+  const docRef = db.collection(collection).doc(id);
   await withRetry(() => docRef.update(data));
   const updated = await docRef.get();
   return updated.data();
